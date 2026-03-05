@@ -1,118 +1,111 @@
-const axios = require('axios');
-const axiosRetry = require('axios-retry');
-const config = require('../config/config');
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal');
 const logger = require('../utils/logger');
 
 class WhatsappService {
   constructor() {
-    this.client = axios.create({
-      baseURL: `${config.whatsapp.apiUrl}/${config.whatsapp.version}`,
-      timeout: 10000,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.whatsapp.accessToken}`
+    this.client = new Client({
+      authStrategy: new LocalAuth(),
+      puppeteer: {
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+          '--disable-gpu'
+        ]
       }
     });
 
-    // Configure automatic retries
-    axiosRetry(this.client, {
-      retries: 3,
-      retryDelay: axiosRetry.exponentialDelay,
-      retryCondition: (error) => {
-        return axiosRetry.isNetworkOrIdempotentRequestError(error) || 
-               (error.response && error.response.status === 429);
-      },
-      onRetry: (retryCount, error, requestConfig) => {
-        logger.warn(`Retrying WhatsApp API request. Attempt ${retryCount}. Error: ${error.message}`);
-      }
+    this.initialize();
+  }
+
+  initialize() {
+    // Generate QR Code in terminal
+    this.client.on('qr', (qr) => {
+      logger.info('QR RECEIVED. Please scan with WhatsApp:');
+      qrcode.generate(qr, { small: true });
     });
+
+    this.client.on('ready', () => {
+      logger.info('WhatsApp Client is ready!');
+      console.log('✅ Bot conectado com sucesso via QR Code!');
+    });
+
+    this.client.on('authenticated', () => {
+      logger.info('WhatsApp Client AUTHENTICATED');
+    });
+
+    this.client.on('auth_failure', (msg) => {
+      logger.error('WhatsApp AUTHENTICATION FAILURE:', msg);
+    });
+
+    this.client.on('disconnected', (reason) => {
+      logger.warn('WhatsApp Client was DISCONNECTED:', reason);
+    });
+
+    this.client.initialize();
   }
 
   /**
    * Sends a text message to a WhatsApp user
-   * @param {string} to 
+   * @param {string} to - Number in format 5511999999999
    * @param {string} text 
    * @returns {Promise<Object>}
    */
   async sendTextMessage(to, text) {
     try {
-      const payload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to,
-        type: 'text',
-        text: { body: text }
-      };
-
-      logger.info(`Sending message to ${to}...`, { payload });
-
-      const response = await this.client.post(`/${config.whatsapp.phoneNumberId}/messages`, payload);
-      
-      logger.info(`Message sent successfully to ${to}. Message ID: ${response.data.messages[0].id}`);
-      
-      return response.data;
+      // whatsapp-web.js requires number formatted with @c.us
+      const chatId = to.includes('@c.us') ? to : `${to}@c.us`;
+      logger.info(`Sending message to ${chatId}...`);
+      const response = await this.client.sendMessage(chatId, text);
+      logger.info(`Message sent successfully. ID: ${response.id.id}`);
+      return response;
     } catch (error) {
-      this._handleError(error, 'sendTextMessage');
+      logger.error('Error sending WhatsApp message:', error);
+      throw new Error(`Failed to send WhatsApp message: ${error.message}`);
     }
   }
 
   /**
-   * Sends an interactive button menu
+   * For QR Code method, we use plain text menus because interactive buttons 
+   * are only available for Official Cloud API.
    * @param {string} to 
    * @param {string} bodyText 
    * @param {Array} buttons 
-   * @returns {Promise<Object>}
    */
   async sendInteractiveButtons(to, bodyText, buttons) {
     try {
-      const payload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to,
-        type: 'interactive',
-        interactive: {
-          type: 'button',
-          body: { text: bodyText },
-          action: {
-            buttons: buttons.map(btn => ({
-              type: 'reply',
-              reply: {
-                id: btn.id,
-                title: btn.title
-              }
-            }))
-          }
-        }
-      };
-
-      logger.info(`Sending interactive buttons to ${to}...`, { payload });
-
-      const response = await this.client.post(`/${config.whatsapp.phoneNumberId}/messages`, payload);
+      const chatId = to.includes('@c.us') ? to : `${to}@c.us`;
+      let menuText = bodyText + '\n\n';
       
-      logger.info(`Interactive buttons sent successfully to ${to}. Message ID: ${response.data.messages[0].id}`);
-      
-      return response.data;
+      buttons.forEach((btn, index) => {
+        // Since we can't use real buttons, we use text triggers
+        menuText += `👉 Digite *${btn.id === 'CONFIRM_YES' ? 'SIM' : 'CANCELAR'}* para ${btn.title.toLowerCase()}\n`;
+      });
+
+      return await this.sendTextMessage(chatId, menuText);
     } catch (error) {
-      this._handleError(error, 'sendInteractiveButtons');
+      logger.error('Error sending "buttons" (text menu):', error);
+      throw error;
     }
   }
 
-  _handleError(error, context) {
-    const status = error.response ? error.response.status : 'No Response';
-    const data = error.response ? JSON.stringify(error.response.data) : error.message;
-    
-    logger.error(`WhatsApp API Error [${context}]: Status ${status}`, {
-      error: data,
-      config: error.config ? { url: error.config.url, method: error.config.method } : {}
-    });
-
-    if (error.response) {
-      if (status === 401 || status === 403) {
-        throw new Error('Authentication failure with WhatsApp API');
+  /**
+   * Listen to messages from outside (for controller)
+   */
+  onMessage(callback) {
+    this.client.on('message', async (msg) => {
+      // Process only private chats (exclude groups)
+      const chat = await msg.getChat();
+      if (!chat.isGroup) {
+        callback(msg);
       }
-    }
-    
-    throw new Error(`Failed to interact with WhatsApp: ${error.message}`);
+    });
   }
 }
 

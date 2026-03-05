@@ -5,76 +5,29 @@ const sessionManager = require('../utils/session.manager');
 const logger = require('../utils/logger');
 
 class WhatsappController {
-  /**
-   * GET /webhook
-   * Verification for Meta Cloud API Webhook
-   */
-  async verifyWebhook(req, res) {
-    try {
-      const mode = req.query['hub.mode'];
-      const token = req.query['hub.verify_token'];
-      const challenge = req.query['hub.challenge'];
+  constructor() {
+    // Initialize listener for QR Code bot messages
+    this._initListener();
+  }
 
-      if (mode && token) {
-        if (mode === 'subscribe' && token === config.whatsapp.verifyToken) {
-          logger.info('Webhook verified successfully.');
-          return res.status(200).send(challenge);
-        } else {
-          logger.warn('Webhook verification failed: invalid token.');
-          return res.sendStatus(403);
-        }
-      }
-    } catch (error) {
-      logger.error('Error verifying webhook:', error);
-      return res.sendStatus(500);
-    }
+  _initListener() {
+    whatsappService.onMessage(async (msg) => {
+      const from = msg.from.split('@')[0]; // Extract phone number
+      const contact = await msg.getContact();
+      const userName = contact.pushname || 'Usuário';
+      
+      await this._processMessage(from, userName, msg);
+    });
   }
 
   /**
-   * POST /webhook
-   * Handle incoming messages
-   */
-  async handleIncoming(req, res) {
-    try {
-      const { body } = req;
-
-      // Ensure it's a message from WhatsApp
-      if (!body.object || body.object !== 'whatsapp_business_account') {
-        return res.sendStatus(404);
-      }
-
-      // Check for entries
-      if (body.entry && body.entry[0].changes && body.entry[0].changes[0].value.messages) {
-        const messageData = body.entry[0].changes[0].value.messages[0];
-        const contact = body.entry[0].changes[0].value.contacts[0];
-        const from = messageData.from; // Phone number
-        const userName = contact.profile.name;
-        
-        // Asynchronous processing to respond quickly (under 2s as required)
-        this._processMessage(from, userName, messageData).catch(err => {
-          logger.error(`Error processing message from ${from}:`, err);
-        });
-      }
-
-      // Always return 200 immediately to WhatsApp
-      return res.sendStatus(200);
-    } catch (error) {
-      logger.error('Error in handleIncoming:', error);
-      // Return 200 anyway to prevent retries from Meta, but log error
-      return res.sendStatus(200);
-    }
-  }
-
-  /**
-   * Logic for bot flow
+   * Logic for bot flow (adapted for QR Code bot)
    */
   async _processMessage(from, userName, message) {
     const session = sessionManager.get(from);
-    const messageType = message.type;
-    const text = messageType === 'text' ? message.text.body : '';
-    const buttonId = messageType === 'interactive' ? message.interactive.button_reply.id : '';
+    const text = message.body ? message.body.trim() : '';
 
-    logger.info(`Processing message from ${from} [Step: ${session.step}]`);
+    logger.info(`Processing QR message from ${from} [Step: ${session.step}]`);
 
     switch (session.step) {
       case 'START':
@@ -83,20 +36,14 @@ class WhatsappController {
         break;
 
       case 'CHOOSING_CATEGORY':
-        let choice = text.trim();
-        if (choice === '5') {
+        if (text === '5') {
           await whatsappService.sendTextMessage(from, 'Por favor, digite o número do ticket que você deseja consultar (apenas números).');
           sessionManager.set(from, { step: 'AWAITING_TICKET_NUMBER', data: session.data });
           return;
         }
 
-        let category = '';
-        if (messageType === 'text') {
-          const choices = { '1': 'Problema com computador', '2': 'Problema com sistema', '3': 'Problema com acesso', '4': 'Outros' };
-          category = choices[choice];
-        } else if (messageType === 'interactive') {
-          category = buttonId;
-        }
+        const choices = { '1': 'Problema com computador', '2': 'Problema com sistema', '3': 'Problema com acesso', '4': 'Outros' };
+        const category = choices[text];
 
         if (category) {
           session.data.category = category;
@@ -108,7 +55,7 @@ class WhatsappController {
         break;
 
       case 'AWAITING_TICKET_NUMBER':
-        const ticketId = text.trim().replace(/#/, '');
+        const ticketId = text.replace(/#/, '');
         if (!/^[0-9]+$/.test(ticketId)) {
           await whatsappService.sendTextMessage(from, 'Número de ticket inválido. Por favor, digite apenas os números do seu ticket.');
           return;
@@ -118,13 +65,7 @@ class WhatsappController {
           await whatsappService.sendTextMessage(from, `Buscando informações do ticket #${ticketId}...`);
           const ticket = await freshserviceService.getTicket(ticketId);
 
-          const statusMap = {
-            2: 'Aberto',
-            3: 'Em Andamento',
-            4: 'Resolvido',
-            5: 'Fechado'
-          };
-
+          const statusMap = { 2: 'Aberto', 3: 'Em Andamento', 4: 'Resolvido', 5: 'Fechado' };
           const statusText = statusMap[ticket.status] || 'Desconhecido';
 
           const response = `*Status do Ticket #${ticket.id}*\n\n*Assunto:* ${ticket.subject}\n*Status:* ${statusText}`;
@@ -136,9 +77,8 @@ class WhatsappController {
         sessionManager.delete(from);
         break;
 
-
       case 'AWAITING_DESCRIPTION':
-        if (messageType === 'text' && text.length > 5) {
+        if (text.length > 5) {
           session.data.description = text;
           
           const confirmationText = `Confirma a abertura do chamado?\n\n*Nome:* ${session.data.userName}\n*Problema:* ${session.data.category}\n*Descrição:* ${session.data.description}`;
@@ -155,7 +95,8 @@ class WhatsappController {
         break;
 
       case 'CONFIRMATION':
-        if (buttonId === 'CONFIRM_YES') {
+        const normalizedText = text.toUpperCase();
+        if (normalizedText === 'SIM') {
           await whatsappService.sendTextMessage(from, '⏳ Criando seu ticket no Freshservice...');
           
           try {
@@ -172,12 +113,14 @@ class WhatsappController {
             sessionManager.delete(from);
           } catch (error) {
             logger.error('Failed to create ticket:', error);
-            await whatsappService.sendTextMessage(from, '❌ Ocorreu um erro ao criar o chamado no Freshservice. Por favor, tente novamente mais tarde ou entre em contato via telefone.');
+            await whatsappService.sendTextMessage(from, '❌ Ocorreu um erro ao criar o chamado no Freshservice. Por favor, tente novamente mais tarde.');
             sessionManager.delete(from);
           }
-        } else {
+        } else if (normalizedText === 'CANCELAR') {
           await whatsappService.sendTextMessage(from, 'Atendimento cancelado. Se precisar de algo, é só enviar um "Olá" novamente! 👋');
           sessionManager.delete(from);
+        } else {
+          await whatsappService.sendTextMessage(from, 'Por favor, digite *SIM* para confirmar ou *CANCELAR* para desistir.');
         }
         break;
 
@@ -190,11 +133,14 @@ class WhatsappController {
 
   async _sendMainMenu(from, userName) {
     const welcomeText = `Olá ${userName} 👋 Bem-vindo ao Suporte de TI.\n\nComo podemos ajudar hoje?`;
-    
     const menu = `${welcomeText}\n\n*Para abrir um novo chamado, digite o número da opção:*\n1 - Problema com computador\n2 - Problema com sistema\n3 - Problema com acesso\n4 - Outros\n\n*Para consultar um chamado existente, digite:*\n5 - Status de um ticket`;
     
     await whatsappService.sendTextMessage(from, menu);
   }
+
+  // Webhook methods kept for backward compatibility or verification, but not used for QR flow
+  async verifyWebhook(req, res) { return res.sendStatus(200); }
+  async handleIncoming(req, res) { return res.sendStatus(200); }
 }
 
 module.exports = new WhatsappController();

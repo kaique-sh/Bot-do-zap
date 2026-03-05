@@ -40,7 +40,8 @@ process.on('unhandledRejection', (reason, promise) => {
 const PORT = config.port;
 app.listen(PORT, () => {
   logger.info(`Server is running on port ${PORT}`);
-  console.log(`✅ Bot do WhatsApp ativo na porta ${PORT}`);
+  console.log(`✅ Servidor ativo na porta ${PORT}`);
+  console.log(`🚀 Inicializando WhatsApp Bot via QR Code...`);
 });
 
 module.exports = app;

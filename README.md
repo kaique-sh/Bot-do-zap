@@ -4,20 +4,21 @@ Bot corporativo profissional desenvolvido em Node.js para integração direta en
 
 ## 📋 Funcionalidades
 
-- ✅ **Webhook de Verificação:** Pronto para validar com a Meta Cloud API.
+- ✅ **Conexão via QR Code:** Não depende da Cloud API (Meta). Escaneie o QR no terminal.
+- ✅ **Persistência Local:** A sessão é salva localmente, evitando novos scans ao reiniciar.
 - ✅ **Fluxo Interativo:** Menu de opções, coleta de descrição e confirmação.
 - ✅ **Integração Freshservice:** Criação automática de tickets com todos os campos obrigatórios.
-- ✅ **Resiliência:** Retry automático (3x) em falhas de API e tratamento de erros global.
-- ✅ **Logs Estruturados:** Utiliza Winston para logs em arquivos e console.
 - ✅ **Consulta de Status:** Permite que o usuário verifique o status de um ticket existente.
+- ✅ **Resiliência:** Retry automático (3x) em falhas de API do Freshservice.
 
 ## 🛠️ Stack Tecnológica
 
 - **Node.js** (LTS)
-- **Express.js** (Framework Web)
-- **Axios** (Requisições HTTP com suporte a retry)
+- **whatsapp-web.js** (Integração com WhatsApp via QR Code)
+- **qrcode-terminal** (Exibição do QR Code no terminal)
+- **Express.js** (Framework Web para Health Check e monitoramento)
+- **Axios** (Requisições HTTP para Freshservice)
 - **Winston** (Logging profissional)
-- **Dotenv** (Gerenciamento de variáveis de ambiente)
 - **PM2** (Gerenciador de processos)
 
 ## 📁 Estrutura do Projeto
@@ -25,20 +26,24 @@ Bot corporativo profissional desenvolvido em Node.js para integração direta en
 ```text
 src/
   ├── config/        # Configurações centralizadas
-  ├── controllers/   # Lógica de controle (WhatsApp Webhook)
-  ├── middlewares/   # Middlewares (Erro, Assinatura)
-  ├── routes/        # Definição de rotas
-  ├── services/      # Integrações externas (Freshservice, WhatsApp)
+  ├── controllers/   # Lógica do Bot (Listener de mensagens)
+  ├── middlewares/   # Middlewares (Erro)
+  ├── routes/        # Definição de rotas (Health check)
+  ├── services/      # Integrações externas (Freshservice, WhatsApp Web)
   ├── utils/         # Utilitários (Logger, Session Manager)
   └── app.js         # Ponto de entrada da aplicação
 ```
 
-## 🚀 Instalação e Configuração
+## 🚀 Instalação e Configuração na VPS Ubuntu
 
 ### 1. Pré-requisitos
 - Node.js instalado (v16+)
-- Conta no Meta Developers (WhatsApp Cloud API)
-- Conta no Freshservice com API Key disponível
+- **Dependências do Chromium** (Necessário para rodar o WhatsApp Web na VPS):
+
+```bash
+sudo apt update
+sudo apt install -y gconf-service libasound2 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgcc1 libgconf-2-4 libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 ca-certificates fonts-liberation libappindicator1 libnss3 lsb-release xdg-utils wget libgbm-dev
+```
 
 ### 2. Instalação
 ```bash
@@ -48,42 +53,28 @@ npm install
 ```
 
 ### 3. Variáveis de Ambiente
-Copie o arquivo `.env.example` para `.env` e preencha as informações:
+Copie o arquivo `.env.example` para `.env` e preencha sua API Key do Freshservice.
 ```bash
 cp .env.example .env
+nano .env
 ```
 
-| Variável | Descrição |
-|----------|-----------|
-| `FRESHSERVICE_API_KEY` | Sua chave de API do Freshservice |
-| `WHATSAPP_ACCESS_TOKEN` | Token de acesso temporário ou permanente da Meta |
-| `WHATSAPP_VERIFY_TOKEN` | Token definido por você na configuração do Webhook |
-| `WHATSAPP_PHONE_NUMBER_ID` | ID do número de telefone na Meta Cloud API |
-| `WHATSAPP_APP_SECRET` | Segredo do aplicativo Meta (opcional para validação de assinatura) |
+## 💻 Execução e Conexão
 
-## 💻 Execução
-
-### Modo Desenvolvimento
+### 1. Iniciar em modo interativo (para o primeiro scan)
 ```bash
-npm run dev
+npm start
 ```
+*Aguarde o QR Code aparecer no terminal, abra seu WhatsApp no celular > Dispositivos Conectados > Conectar um dispositivo.*
 
-### Modo Produção (PM2)
+### 2. Modo Produção (PM2)
+Após conectar o dispositivo uma vez, você pode rodar em segundo plano:
 ```bash
-# Instalar PM2 globalmente se não tiver
-npm install pm2 -g
-
-# Iniciar aplicação
 pm2 start ecosystem.config.js
-
-# Ver logs
-pm2 logs whatsapp-bot-freshservice
 ```
 
-## 🔗 Endpoints do Webhook
+## 🔗 Endpoints
 
-- **Verificação (GET):** `http://seu-dominio.com/api/webhook`
-- **Recebimento (POST):** `http://seu-dominio.com/api/webhook`
 - **Health Check:** `http://seu-dominio.com/api/health`
 
 ## 🛡️ Segurança
