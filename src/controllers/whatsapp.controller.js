@@ -64,11 +64,32 @@ class WhatsappController {
         try {
           await whatsappService.sendTextMessage(from, `Buscando informações do ticket #${ticketId}...`);
           const ticket = await freshserviceService.getTicket(ticketId);
+          const conversations = await freshserviceService.getTicketConversations(ticketId);
 
-          const statusMap = { 2: 'Aberto', 3: 'Em Andamento', 4: 'Resolvido', 5: 'Fechado' };
+          // Encontrar a última resposta pública de um analista
+          const lastAgentReply = conversations
+            .filter(c => c.private === false && c.user_id !== ticket.requester_id)
+            .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))[0];
+
+          const statusMap = {
+            2: 'Aberto',
+            3: 'Em Andamento',
+            4: 'Resolvido',
+            5: 'Fechado'
+          };
+
           const statusText = statusMap[ticket.status] || 'Desconhecido';
 
-          const response = `*Status do Ticket #${ticket.id}*\n\n*Assunto:* ${ticket.subject}\n*Status:* ${statusText}`;
+          let response = `*Status do Ticket #${ticket.id}*\n\n*Assunto:* ${ticket.subject}\n*Status:* ${statusText}`;
+
+          if (lastAgentReply) {
+            // Limpa o HTML da resposta para enviar texto puro
+            const cleanBody = lastAgentReply.body_text.replace(/<[^>]*>/g, '\n').trim();
+            response += `\n\n*Última atualização do analista:*\n${cleanBody}`;
+          } else {
+            response += `\n\nNenhuma atualização de um analista encontrada ainda.`;
+          }
+
           await whatsappService.sendTextMessage(from, response);
         } catch (error) {
           logger.error(`Error fetching ticket ${ticketId}:`, error);

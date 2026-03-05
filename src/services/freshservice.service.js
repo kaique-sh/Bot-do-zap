@@ -94,6 +94,22 @@ class FreshserviceService {
     }
   }
 
+  /**
+   * Retrieves all conversations for a ticket
+   * @param {string} ticketId 
+   * @returns {Promise<Array>}
+   */
+  async getTicketConversations(ticketId) {
+    try {
+      logger.info(`Fetching conversations for ticket #${ticketId}...`);
+      const response = await this.client.get(`/tickets/${ticketId}/conversations`);
+      logger.info(`Found ${response.data.conversations.length} conversations for ticket #${ticketId}.`);
+      return response.data.conversations;
+    } catch (error) {
+      this._handleError(error, 'getTicketConversations');
+    }
+  }
+
   _handleError(error, context) {
     const status = error.response ? error.response.status : 'No Response';
     const data = error.response ? JSON.stringify(error.response.data) : error.message;
