@@ -39,6 +39,12 @@ class FreshserviceService {
    */
   async createTicket(ticketData) {
     try {
+      // Garante que a categoria não tenha acentos para evitar erro 400
+      const cleanCategory = config.freshservice.defaultCategory
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase();
+
       const payload = {
         subject: ticketData.subject,
         description: ticketData.description,
@@ -50,7 +56,7 @@ class FreshserviceService {
         group_id: config.freshservice.defaultGroupId,
         department_id: config.freshservice.defaultDepartmentId,
         workspace_id: config.freshservice.workspaceId,
-        category: config.freshservice.defaultCategory,
+        category: cleanCategory,
         sub_category: config.freshservice.defaultSubcategory
       };
 
