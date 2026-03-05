@@ -12,7 +12,7 @@ class WhatsappController {
 
   _initListener() {
     whatsappService.onMessage(async (msg) => {
-      const from = msg.from.split('@')[0]; // Extract phone number
+      const from = msg.from; // Usar o ID completo (ex: 5511... @c.us ou LID)
       const contact = await msg.getContact();
       const userName = contact.pushname || 'Usuário';
       

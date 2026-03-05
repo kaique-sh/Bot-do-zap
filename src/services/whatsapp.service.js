@@ -62,10 +62,9 @@ class WhatsappService {
    */
   async sendTextMessage(to, text) {
     try {
-      // whatsapp-web.js requires number formatted with @c.us
-      const chatId = to.includes('@c.us') ? to : `${to}@c.us`;
-      logger.info(`Sending message to ${chatId}...`);
-      const response = await this.client.sendMessage(chatId, text);
+      // Use o ID (to) diretamente, sem concatenar @c.us
+      logger.info(`Sending message to ${to}...`);
+      const response = await this.client.sendMessage(to, text);
       logger.info(`Message sent successfully. ID: ${response.id.id}`);
       return response;
     } catch (error) {
@@ -83,7 +82,6 @@ class WhatsappService {
    */
   async sendInteractiveButtons(to, bodyText, buttons) {
     try {
-      const chatId = to.includes('@c.us') ? to : `${to}@c.us`;
       let menuText = bodyText + '\n\n';
       
       buttons.forEach((btn, index) => {
@@ -91,7 +89,7 @@ class WhatsappService {
         menuText += `👉 Digite *${btn.id === 'CONFIRM_YES' ? 'SIM' : 'CANCELAR'}* para ${btn.title.toLowerCase()}\n`;
       });
 
-      return await this.sendTextMessage(chatId, menuText);
+      return await this.sendTextMessage(to, menuText);
     } catch (error) {
       logger.error('Error sending "buttons" (text menu):', error);
       throw error;
