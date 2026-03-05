@@ -100,11 +100,13 @@ class WhatsappController {
           await whatsappService.sendTextMessage(from, '⏳ Criando seu ticket no Freshservice...');
           
           try {
+            const cleanPhone = from.split('@')[0];
             const ticketData = {
               subject: `[WhatsApp] Atendimento - ${session.data.userName}`,
-              description: `Solicitação de atendimento via WhatsApp\n\nContato: ${session.data.userName}\nTelefone: ${from}\n\nCategoria: ${session.data.category}\nMensagem:\n${session.data.description}\n\n---\nTicket criado automaticamente pelo bot WhatsApp`,
-              email: `whatsapp+${from}@nextbot.com`,
-              phone: from
+              description: `Solicitação de atendimento via WhatsApp\n\nContato: ${session.data.userName}\nTelefone: ${cleanPhone}\n\nCategoria: ${session.data.category}\nMensagem:\n${session.data.description}\n\n---\nOrigem: WhatsApp Bot\nData: ${new Date().toLocaleString('pt-BR')}\nTicket criado automaticamente pelo bot WhatsApp`,
+              email: `whatsapp+${cleanPhone}@nextbot.com`,
+              phone: cleanPhone,
+              sub_category: session.data.category // Mapear categoria escolhida para sub_category do FS
             };
 
             const ticket = await freshserviceService.createTicket(ticketData);

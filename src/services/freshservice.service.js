@@ -51,12 +51,7 @@ class FreshserviceService {
         department_id: config.freshservice.defaultDepartmentId,
         workspace_id: config.freshservice.workspaceId,
         category: config.freshservice.defaultCategory,
-        sub_category: config.freshservice.defaultSubcategory,
-        custom_fields: {
-          origem: 'WhatsApp Bot',
-          numero_whatsapp: ticketData.phone,
-          data_solicitacao: new Date().toISOString()
-        }
+        sub_category: ticketData.sub_category || config.freshservice.defaultSubcategory
       };
 
       logger.info('Creating Freshservice ticket...', { payload });
