@@ -51,7 +51,7 @@ class FreshserviceService {
         department_id: config.freshservice.defaultDepartmentId,
         workspace_id: config.freshservice.workspaceId,
         category: config.freshservice.defaultCategory,
-        sub_category: ticketData.sub_category || config.freshservice.defaultSubcategory
+        sub_category: config.freshservice.defaultSubcategory
       };
 
       logger.info('Creating Freshservice ticket...', { payload });

@@ -10,7 +10,7 @@ module.exports = {
     defaultDepartmentId: parseInt(process.env.FRESHSERVICE_DEFAULT_DEPARTMENT_ID) || 21000431906,
     defaultPriority: parseInt(process.env.FRESHSERVICE_DEFAULT_PRIORITY) || 2,
     defaultSource: parseInt(process.env.FRESHSERVICE_DEFAULT_SOURCE) || 4,
-    defaultCategory: process.env.FRESHSERVICE_DEFAULT_CATEGORY || 'SUPORTE TÉCNICO',
+    defaultCategory: process.env.FRESHSERVICE_DEFAULT_CATEGORY || 'SUPORTE TECNICO',
     defaultSubcategory: process.env.FRESHSERVICE_DEFAULT_SUBCATEGORY || 'Outros Atendimentos',
   },
   whatsapp: {

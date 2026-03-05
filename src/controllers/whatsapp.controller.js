@@ -103,10 +103,10 @@ class WhatsappController {
             const cleanPhone = from.split('@')[0];
             const ticketData = {
               subject: `[WhatsApp] Atendimento - ${session.data.userName}`,
-              description: `Solicitação de atendimento via WhatsApp\n\nContato: ${session.data.userName}\nTelefone: ${cleanPhone}\n\nCategoria: ${session.data.category}\nMensagem:\n${session.data.description}\n\n---\nOrigem: WhatsApp Bot\nData: ${new Date().toLocaleString('pt-BR')}\nTicket criado automaticamente pelo bot WhatsApp`,
+              description: `Solicitação de atendimento via WhatsApp\n\nContato: ${session.data.userName}\nTelefone: ${cleanPhone}\n\nCategoria Escolhida: ${session.data.category}\nMensagem:\n${session.data.description}\n\n---\nOrigem: WhatsApp Bot\nData: ${new Date().toLocaleString('pt-BR')}\nTicket criado automaticamente pelo bot WhatsApp`,
               email: `whatsapp+${cleanPhone}@nextbot.com`,
-              phone: cleanPhone,
-              sub_category: session.data.category // Mapear categoria escolhida para sub_category do FS
+              phone: cleanPhone
+              // Removi o sub_category dinâmico para usar o padrão fixo e evitar erro 400
             };
 
             const ticket = await freshserviceService.createTicket(ticketData);
