@@ -48,7 +48,10 @@ class WhatsappService {
       logger.warn('WhatsApp Client was DISCONNECTED:', reason);
     });
 
-    this.client.initialize();
+    this.client.initialize().catch(err => {
+      logger.error('FALHA AO INICIALIZAR WHATSAPP CLIENT:', err);
+      console.error('❌ Erro crítico: Não foi possível iniciar o WhatsApp. Verifique se as dependências do Chromium estão instaladas.');
+    });
   }
 
   /**
