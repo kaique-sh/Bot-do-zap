@@ -39,11 +39,17 @@ class FreshserviceService {
    */
   async createTicket(ticketData) {
     try {
-      // Garante que a categoria não tenha acentos para evitar erro 400
-      const cleanCategory = config.freshservice.defaultCategory
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toUpperCase();
+      // Função auxiliar para limpar texto (remover acentos e colocar em maiúsculas)
+      const cleanText = (text) => {
+        if (!text) return "";
+        return text
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toUpperCase();
+      };
+
+      const cleanCategory = cleanText(config.freshservice.defaultCategory);
+      const cleanSubCategory = cleanText(config.freshservice.defaultSubcategory);
 
       const payload = {
         subject: ticketData.subject,
@@ -57,7 +63,7 @@ class FreshserviceService {
         department_id: config.freshservice.defaultDepartmentId,
         workspace_id: config.freshservice.workspaceId,
         category: cleanCategory,
-        sub_category: config.freshservice.defaultSubcategory
+        sub_category: cleanSubCategory
       };
 
       logger.info('Creating Freshservice ticket...', { payload });

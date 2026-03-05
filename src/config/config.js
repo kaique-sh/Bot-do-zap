@@ -11,7 +11,7 @@ module.exports = {
     defaultPriority: parseInt(process.env.FRESHSERVICE_DEFAULT_PRIORITY) || 2,
     defaultSource: parseInt(process.env.FRESHSERVICE_DEFAULT_SOURCE) || 4,
     defaultCategory: process.env.FRESHSERVICE_DEFAULT_CATEGORY || 'SUPORTE TECNICO',
-    defaultSubcategory: process.env.FRESHSERVICE_DEFAULT_SUBCATEGORY || 'Outros Atendimentos',
+    defaultSubcategory: process.env.FRESHSERVICE_DEFAULT_SUBCATEGORY || 'OUTROS ATENDIMENTOS',
   },
   whatsapp: {
     verifyToken: process.env.WHATSAPP_VERIFY_TOKEN,
