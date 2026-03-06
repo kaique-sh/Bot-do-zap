@@ -3,8 +3,8 @@ module.exports = {
     {
       name: 'whatsapp-bot-freshservice',
       script: './src/app.js',
-      instances: 'max', // or a specific number like 2
-      exec_mode: 'cluster',
+      instances: 1,       // Rodar apenas uma instância
+      exec_mode: 'fork',    // Mudar de cluster para fork
       autorestart: true,
       watch: false,
       max_memory_restart: '1G',
