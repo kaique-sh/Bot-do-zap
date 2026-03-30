@@ -5,16 +5,24 @@ const logger = require('../utils/logger');
 
 class FreshserviceService {
   constructor() {
+    const apiKey = config.freshservice.apiKey;
+    const authHeader = 'Basic ' + Buffer.from(apiKey + ':X').toString('base64');
+    
+    // Log de segurança para conferência (mostra apenas as pontas da chave)
+    if (apiKey) {
+      const maskedKey = `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`;
+      logger.info(`Freshservice Service inicializado com a chave: ${maskedKey}`);
+    } else {
+      logger.error('ERRO: FRESHSERVICE_API_KEY não encontrada nas variáveis de ambiente!');
+    }
+
     this.client = axios.create({
       baseURL: `https://${config.freshservice.domain}/api/v2`,
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': authHeader,
         'X-Workspace-Id': String(config.freshservice.workspaceId)
-      },
-      auth: {
-        username: config.freshservice.apiKey,
-        password: 'X'
       }
     });
 
@@ -109,16 +117,19 @@ class FreshserviceService {
     const responseData = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
     
     // Log detalhado para depuração
+    const requestHeaders = error.config ? error.config.headers : {};
+    const authHeader = requestHeaders.Authorization || requestHeaders.authorization;
+    
     logger.error(`🚨 ERRO CRÍTICO NA API FRESHSERVICE [${context}]`, {
       status: status,
       url: error.config ? error.config.url : 'N/A',
       method: error.config ? error.config.method : 'N/A',
       payload_enviado: error.config && error.config.data ? JSON.parse(error.config.data) : 'N/A',
       resposta_api: responseData,
-      headers_request: error.config ? {
-        ...error.config.headers,
-        Authorization: error.config.headers.Authorization ? 'OCULTADO (Contém API Key)' : 'NÃO ENCONTRADO'
-      } : 'N/A'
+      headers_request: {
+        ...requestHeaders,
+        Authorization: authHeader ? 'OCULTADO (Contém API Key)' : 'NÃO ENCONTRADO'
+      }
     });
 
     if (error.response) {
