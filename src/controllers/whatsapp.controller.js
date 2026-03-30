@@ -6,33 +6,62 @@ const logger = require('../utils/logger');
 
 class WhatsappController {
   constructor() {
+    this.isInitialized = false;
+    this.processedMessages = new Set();
     // Initialize listener for QR Code bot messages
     this._initListener();
   }
 
   _initListener() {
+    if (this.isInitialized) return;
+    
     whatsappService.onMessage(async (msg) => {
+      const msgId = msg.id.id;
+      
+      // Evitar processamento duplicado da mesma mensagem
+      if (this.processedMessages.has(msgId)) {
+        logger.info(`Message ${msgId} already processed, skipping.`);
+        return;
+      }
+      
+      this.processedMessages.add(msgId);
+      
+      // Limpar cache de mensagens antigas a cada 100 mensagens para não vazar memória
+      if (this.processedMessages.size > 100) {
+        const firstValue = this.processedMessages.values().next().value;
+        this.processedMessages.delete(firstValue);
+      }
+
       const from = msg.from; // Usar o ID completo (ex: 5511... @c.us ou LID)
       const contact = await msg.getContact();
       const userName = contact.pushname || 'Usuário';
+      const realNumber = contact.number; // Este é o número de telefone real (MSISDN)
       
-      await this._processMessage(from, userName, msg);
+      await this._processMessage(from, userName, msg, realNumber);
     });
+
+    this.isInitialized = true;
   }
 
   /**
    * Logic for bot flow (adapted for QR Code bot)
    */
-  async _processMessage(from, userName, message) {
+  async _processMessage(from, userName, message, realNumber) {
     const session = sessionManager.get(from);
     const text = message.body ? message.body.trim() : '';
 
-    logger.info(`Processing QR message from ${from} [Step: ${session.step}]`);
+    // Garantir que o realNumber e o nome estejam sempre atualizados na sessão
+    session.data.userName = userName;
+    if (realNumber) {
+      session.data.realNumber = realNumber;
+    }
+
+    logger.info(`Processing QR message from ${from} (Real Number: ${session.data.realNumber}) [Step: ${session.step}]`);
 
     switch (session.step) {
       case 'START':
         await this._sendMainMenu(from, userName);
-        sessionManager.set(from, { step: 'CHOOSING_CATEGORY', data: { userName } });
+        sessionManager.set(from, { step: 'CHOOSING_CATEGORY', data: session.data });
         break;
 
       case 'CHOOSING_CATEGORY':
@@ -122,11 +151,13 @@ class WhatsappController {
           
           try {
             const cleanPhone = from.split('@')[0];
+            const realPhone = session.data.realNumber || cleanPhone;
+            
             const ticketData = {
               subject: `[WhatsApp] Atendimento - ${session.data.userName}`,
-              description: `Solicitação de atendimento via WhatsApp\n\nContato: ${session.data.userName}\nTelefone: ${cleanPhone}\n\nCategoria Escolhida: ${session.data.category}\nMensagem:\n${session.data.description}\n\n---\nOrigem: WhatsApp Bot\nData: ${new Date().toLocaleString('pt-BR')}\nTicket criado automaticamente pelo bot WhatsApp`,
-              email: `whatsapp+${cleanPhone}@nextbot.com`,
-              phone: cleanPhone
+              description: `Solicitação de atendimento via WhatsApp\n\nContato: ${session.data.userName}\nTelefone: ${realPhone}\n\nCategoria Escolhida: ${session.data.category}\nMensagem:\n${session.data.description}\n\n---\nOrigem: WhatsApp Bot\nData: ${new Date().toLocaleString('pt-BR')}\nTicket criado automaticamente pelo bot WhatsApp`,
+              email: `whatsapp+${realPhone}@nextbot.com`,
+              phone: realPhone
               // Removi o sub_category dinâmico para usar o padrão fixo e evitar erro 400
             };
 
