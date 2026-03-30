@@ -61,9 +61,9 @@ class FreshserviceService {
         category: config.freshservice.defaultCategory,
         sub_category: config.freshservice.defaultSubcategory,
         custom_fields: {
-          origem: "WhatsApp Bot",
-          numero_whatsapp: ticketData.phone,
-          data_solicitacao: new Date().toISOString().split('.')[0] + 'Z'
+          cf_origem: "WhatsApp Bot",
+          cf_numero_whatsapp: ticketData.phone,
+          cf_data_solicitacao: new Date().toISOString().split('.')[0] + 'Z'
         }
       };
 
