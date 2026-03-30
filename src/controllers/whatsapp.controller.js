@@ -146,18 +146,21 @@ class WhatsappController {
 
       case 'CONFIRMATION':
         const normalizedText = text.toUpperCase();
-        if (normalizedText === 'SIM') {
+        // Aceitar tanto "SIM" quanto o texto do botão "Sim, criar"
+        if (normalizedText === 'SIM' || normalizedText.includes('SIM')) {
           await whatsappService.sendTextMessage(from, '⏳ Criando seu ticket no Freshservice...');
           
           try {
             const cleanPhone = from.split('@')[0];
             const realPhone = session.data.realNumber || cleanPhone;
+            // Limpar o número para o e-mail (remover +, espaços, hífens) conforme n8n
+            const emailPhone = realPhone.replace(/[+\s-]/g, '');
             
             const ticketData = {
               subject: `[WhatsApp] Atendimento - ${session.data.userName}`,
               description: `Solicitação de atendimento via WhatsApp\n\nContato: ${session.data.userName}\nTelefone: ${realPhone}\n\nCategoria Escolhida: ${session.data.category}\nMensagem:\n${session.data.description}\n\n---\nOrigem: WhatsApp Bot\nData: ${new Date().toLocaleString('pt-BR')}\nTicket criado automaticamente pelo bot WhatsApp`,
-              email: `whatsapp+${realPhone}@nextbot.com`,
-              phone: realPhone
+              email: `whatsapp+${emailPhone}@nextbot.com`,
+              phone: emailPhone
               // Removi o sub_category dinâmico para usar o padrão fixo e evitar erro 400
             };
 

@@ -10,7 +10,7 @@ class FreshserviceService {
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
-        'X-Workspace-Id': config.freshservice.workspaceId
+        'X-Workspace-Id': String(config.freshservice.workspaceId)
       },
       auth: {
         username: config.freshservice.apiKey,
@@ -39,18 +39,6 @@ class FreshserviceService {
    */
   async createTicket(ticketData) {
     try {
-      // Função auxiliar para limpar texto (remover acentos e colocar em maiúsculas)
-      const cleanText = (text) => {
-        if (!text) return "";
-        return text
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toUpperCase();
-      };
-
-      const cleanCategory = cleanText(config.freshservice.defaultCategory);
-      const cleanSubCategory = cleanText(config.freshservice.defaultSubcategory);
-
       const payload = {
         subject: ticketData.subject,
         description: ticketData.description,
@@ -62,11 +50,16 @@ class FreshserviceService {
         group_id: config.freshservice.defaultGroupId,
         department_id: config.freshservice.defaultDepartmentId,
         workspace_id: config.freshservice.workspaceId,
-        category: cleanCategory,
-        sub_category: cleanSubCategory
+        category: config.freshservice.defaultCategory,
+        sub_category: config.freshservice.defaultSubcategory,
+        custom_fields: {
+          origem: "WhatsApp Bot",
+          numero_whatsapp: ticketData.phone,
+          data_solicitacao: new Date().toISOString().split('.')[0] + 'Z'
+        }
       };
 
-      logger.info('Creating Freshservice ticket...', { payload });
+      logger.info('Creating Freshservice ticket with custom payload...', { payload });
 
       const response = await this.client.post('/tickets', payload);
       
@@ -112,23 +105,38 @@ class FreshserviceService {
 
   _handleError(error, context) {
     const status = error.response ? error.response.status : 'No Response';
-    const data = error.response ? JSON.stringify(error.response.data) : error.message;
+    const data = error.response ? error.response.data : error.message;
+    const responseData = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
     
-    logger.error(`Freshservice API Error [${context}]: Status ${status}`, {
-      error: data,
-      config: error.config ? { url: error.config.url, method: error.config.method } : {}
+    // Log detalhado para depuração
+    logger.error(`🚨 ERRO CRÍTICO NA API FRESHSERVICE [${context}]`, {
+      status: status,
+      url: error.config ? error.config.url : 'N/A',
+      method: error.config ? error.config.method : 'N/A',
+      payload_enviado: error.config && error.config.data ? JSON.parse(error.config.data) : 'N/A',
+      resposta_api: responseData,
+      headers_request: error.config ? {
+        ...error.config.headers,
+        Authorization: error.config.headers.Authorization ? 'OCULTADO (Contém API Key)' : 'NÃO ENCONTRADO'
+      } : 'N/A'
     });
 
     if (error.response) {
-      if (status === 401 || status === 403) {
-        throw new Error('Authentication failure with Freshservice API');
+      if (status === 401) {
+        throw new Error('Falha de Autenticação: A API Key do Freshservice parece inválida ou expirada.');
+      }
+      if (status === 403) {
+        throw new Error('Acesso Negado: O usuário da API Key não tem permissão para criar tickets ou o Workspace ID está incorreto.');
+      }
+      if (status === 400) {
+        throw new Error(`Erro de Validação: A API do Freshservice rejeitou os dados. Resposta: ${responseData}`);
       }
       if (status === 429) {
-        throw new Error('Rate limit exceeded on Freshservice API');
+        throw new Error('Limite de requisições excedido na API do Freshservice.');
       }
     }
     
-    throw new Error(`Failed to interact with Freshservice: ${error.message}`);
+    throw new Error(`Erro ao interagir com Freshservice: ${error.message}`);
   }
 }
 
